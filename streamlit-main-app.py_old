@@ -1,0 +1,112 @@
+# File: app.py
+import streamlit as st
+import plotly.express as px
+import plotly.graph_objs as go
+from database_config import execute_query
+
+def main():
+    st.title('Consulting Pricing Model Dashboard')
+    
+    # Sidebar for navigation
+    menu = st.sidebar.selectbox('Menu', [
+        'Project Overview', 
+        'Consultant Rates', 
+        'Project Staffing', 
+        'Currency Analysis'
+    ])
+    
+    if menu == 'Project Overview':
+        project_overview()
+    elif menu == 'Consultant Rates':
+        consultant_rates()
+    elif menu == 'Project Staffing':
+        project_staffing()
+    elif menu == 'Currency Analysis':
+        currency_analysis()
+
+def project_overview():
+    st.header('Project Overview')
+    
+    # Fetch project data
+    projects_query = """
+    SELECT p.project_id, p.project_name, s.status_name, c.currency_name, 
+           p.number_epochs, p.created_at
+    FROM projects p
+    JOIN status s ON p.status_id = s.status_id
+    JOIN currency c ON p.currency_id = c.currency_id
+    """
+    projects_df = execute_query(projects_query)
+    
+    # Display projects in a table
+    st.dataframe(projects_df)
+    
+    # Project status pie chart
+    status_counts = projects_df['status_name'].value_counts()
+    fig = px.pie(status_counts, values=status_counts.values, names=status_counts.index, 
+                 title='Project Status Distribution')
+    st.plotly_chart(fig)
+
+def consultant_rates():
+    st.header('Consultant Rates')
+    
+    # Fetch rate card data
+    rates_query = """
+    SELECT cl.level_name, rc.cost_usd, rc.list_rate_usd, rc.rate_year
+    FROM rate_card rc
+    JOIN consultant_level cl ON rc.consultant_level_id = cl.consultant_level_id
+    """
+    rates_df = execute_query(rates_query)
+    
+    # Bar chart of rates
+    fig = px.bar(rates_df, x='level_name', y='list_rate_usd', 
+                 title='Consultant Rates by Level')
+    st.plotly_chart(fig)
+    
+    # Detailed rate table
+    st.dataframe(rates_df)
+
+def project_staffing():
+    st.header('Project Staffing')
+    
+    # Fetch project staffing details
+    staffing_query = """
+    SELECT p.project_name, r.role_name, 
+           pe.first_name || ' ' || pe.last_name AS full_name,
+           pd.epoch_percentage
+    FROM projects_detail pd
+    JOIN projects p ON pd.project_id = p.project_id
+    JOIN roles r ON pd.role_id = r.role_id
+    JOIN personnel pe ON pd.personnel_id = pe.personnel_id
+    """
+    staffing_df = execute_query(staffing_query)
+    
+    # Display staffing details
+    st.dataframe(staffing_df)
+    
+    # Role distribution pie chart
+    role_counts = staffing_df['role_name'].value_counts()
+    fig = px.pie(role_counts, values=role_counts.values, names=role_counts.index, 
+                 title='Role Distribution Across Projects')
+    st.plotly_chart(fig)
+
+def currency_analysis():
+    st.header('Currency Analysis')
+    
+    # Fetch currency data
+    currency_query = """
+    SELECT currency_name, exchange_rate, 
+           start_date, end_date
+    FROM currency
+    """
+    currency_df = execute_query(currency_query)
+    
+    # Display currency rates
+    st.dataframe(currency_df)
+    
+    # Exchange rate bar chart
+    fig = px.bar(currency_df, x='currency_name', y='exchange_rate', 
+                 title='Currency Exchange Rates')
+    st.plotly_chart(fig)
+
+if __name__ == '__main__':
+    main()
